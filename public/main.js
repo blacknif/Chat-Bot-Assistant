@@ -99,8 +99,20 @@ function renderMessage(role, text, animate = true) {
 
   const bubble = document.createElement("div");
   bubble.className = "bubble";
-  bubble.innerHTML = role === "ai" ? marked.parse(text) : "";
-  if (role === "user") bubble.textContent = text;
+  if (role === "ai") {
+    bubble.innerHTML = marked.parse(text);
+    renderMathInElement(bubble, {
+      delimiters: [
+        { left: "$$", right: "$$", display: true },
+        { left: "$",  right: "$",  display: false },
+        { left: "\\[", right: "\\]", display: true },
+        { left: "\\(", right: "\\)", display: false },
+      ],
+      throwOnError: false,
+    });
+  } else {
+    bubble.textContent = text;
+  }
 
   msg.appendChild(label);
   msg.appendChild(bubble);

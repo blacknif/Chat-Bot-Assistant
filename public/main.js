@@ -145,6 +145,7 @@ function renderMessage(role, text, animate = true) {
   if (role === "ai") {
     const color = TONE_COLORS[classifyTone(text)];
     bubble.style.color = color;
+    bubble.style.setProperty("--tone-color", color);
     bubble.innerHTML = marked.parse(text);
     renderMathInElement(bubble, {
       delimiters: [

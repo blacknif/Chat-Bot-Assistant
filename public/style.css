@@ -455,6 +455,10 @@ code {
   justify-content: center;
 }
 
+.empty-icon svg {
+  animation: nova-spin 18s linear infinite;
+}
+
 .empty-state h2 {
   font-size: 18px;
   font-weight: 500;

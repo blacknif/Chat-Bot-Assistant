@@ -3,6 +3,20 @@ const STORAGE_KEY = "chatHistory";
 const SHOULD_PERSIST = true;
 const MAX_HISTORY = 20;
 
+// ── AI message color palette ──────────────────────────────────────
+// Each AI reply cycles through these; chosen for readability on #222228
+const AI_COLORS = [
+  "#c4bfff", // soft lavender
+  "#7dd3fc", // sky blue
+  "#86efac", // mint green
+  "#fda4af", // rose pink
+  "#fcd34d", // amber
+  "#a5f3fc", // cyan
+  "#d8b4fe", // violet
+  "#fb923c", // orange
+];
+let aiColorIndex = 0;
+
 const chatContainer = document.getElementById("chat-container");
 const userInput = document.getElementById("user-input");
 const sendBtn = document.getElementById("send-btn");
@@ -100,6 +114,9 @@ function renderMessage(role, text, animate = true) {
   const bubble = document.createElement("div");
   bubble.className = "bubble";
   if (role === "ai") {
+    const color = AI_COLORS[aiColorIndex % AI_COLORS.length];
+    aiColorIndex++;
+    bubble.style.color = color;
     bubble.innerHTML = marked.parse(text);
     renderMathInElement(bubble, {
       delimiters: [

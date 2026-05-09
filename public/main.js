@@ -3,19 +3,48 @@ const STORAGE_KEY = "chatHistory";
 const SHOULD_PERSIST = true;
 const MAX_HISTORY = 20;
 
-// ── AI message color palette ──────────────────────────────────────
-// Each AI reply cycles through these; chosen for readability on #222228
-const AI_COLORS = [
-  "#c4bfff", // soft lavender
-  "#7dd3fc", // sky blue
-  "#86efac", // mint green
-  "#fda4af", // rose pink
-  "#fcd34d", // amber
-  "#a5f3fc", // cyan
-  "#d8b4fe", // violet
-  "#fb923c", // orange
-];
-let aiColorIndex = 0;
+// ── Semantic tone → color mapping ────────────────────────────────
+// Color reflects the nature of the response, not random cycling.
+// All colors contrast-checked against the #222228 bubble background.
+const TONE_COLORS = {
+  technical:   "#7dd3fc", // sky blue    — code, math, logic, data
+  creative:    "#d8b4fe", // violet      — poetry, stories, imagination
+  warning:     "#fcd34d", // amber       — caution, errors, important notes
+  positive:    "#86efac", // mint green  — praise, success, encouragement
+  empathetic:  "#fda4af", // rose        — emotional, supportive, apologetic
+  curious:     "#fb923c", // orange      — questions back, exploring ideas
+  default:     "#c4bfff", // lavender    — general explanations, neutral
+};
+
+function classifyTone(text) {
+  const t = text.toLowerCase();
+
+  // Technical: code blocks, math symbols, or technical vocabulary
+  if (/```|`[^`]+`|\$[^$]+\$|\\frac|\\int|algorithm|function|variable|syntax|equation|formula|derivative|integral|python|javascript|css|html|api|debug|error:|exception/.test(t))
+    return "technical";
+
+  // Warning: explicit caution language or error states
+  if (/\b(warning|caution|careful|danger|risk|important note|be aware|watch out|avoid|don't|cannot|invalid|mistake|wrong|incorrect|failed|failure)\b/.test(t))
+    return "warning";
+
+  // Positive: affirmation, success, encouragement
+  if (/\b(great|excellent|perfect|well done|correct|you got it|exactly right|congrats|congratulations|nicely done|that's right|good job|absolutely|you're right)\b/.test(t))
+    return "positive";
+
+  // Empathetic: emotional or supportive tone
+  if (/\b(i understand|i'm sorry|that sounds|how are you|feel free|don't worry|it's okay|totally normal|that must|i can imagine|take care|here for you)\b/.test(t))
+    return "empathetic";
+
+  // Creative: imaginative or artistic content
+  if (/\b(poem|poetry|story|imagine|once upon|metaphor|rhyme|haiku|creative|narrative|character|fictional|fantasy|tale|sonnet|verse)\b/.test(t))
+    return "creative";
+
+  // Curious: the AI is asking or exploring
+  if (/\?/.test(t) && (t.match(/\?/g) || []).length >= 2)
+    return "curious";
+
+  return "default";
+}
 
 const chatContainer = document.getElementById("chat-container");
 const userInput = document.getElementById("user-input");
@@ -114,8 +143,7 @@ function renderMessage(role, text, animate = true) {
   const bubble = document.createElement("div");
   bubble.className = "bubble";
   if (role === "ai") {
-    const color = AI_COLORS[aiColorIndex % AI_COLORS.length];
-    aiColorIndex++;
+    const color = TONE_COLORS[classifyTone(text)];
     bubble.style.color = color;
     bubble.innerHTML = marked.parse(text);
     renderMathInElement(bubble, {

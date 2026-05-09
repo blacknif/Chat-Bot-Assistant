@@ -327,18 +327,50 @@ code {
   opacity: 0.9;
 }
 
-/* Scrollbar — Firefox */
+/* ── Scrollbars ───────────────────────────────────────────────── */
+
+/* Chat — Firefox */
 #chat-container {
   scrollbar-width: thin;
-  scrollbar-color: var(--surface2) transparent;
+  scrollbar-color: rgba(255, 255, 255, 0.08) transparent;
 }
 
-/* Scrollbar — Chrome/Safari */
-#chat-container::-webkit-scrollbar { width: 5px; }
-#chat-container::-webkit-scrollbar-track { background: transparent; }
+/* Chat — Chrome/Safari */
+#chat-container::-webkit-scrollbar {
+  width: 4px;
+}
+#chat-container::-webkit-scrollbar-track {
+  background: transparent;
+}
 #chat-container::-webkit-scrollbar-thumb {
-  background: var(--surface2);
-  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 99px;
+  transition: background 0.2s ease;
+}
+#chat-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* Textarea — Firefox */
+#user-input {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+
+/* Textarea — Chrome/Safari */
+#user-input::-webkit-scrollbar {
+  width: 3px;
+}
+#user-input::-webkit-scrollbar-track {
+  background: transparent;
+}
+#user-input::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 99px;
+  transition: background 0.2s ease;
+}
+#user-input::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
 }
 
 .bubble p { margin-bottom: 12px; }

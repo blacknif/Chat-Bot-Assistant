@@ -344,7 +344,81 @@ code {
   opacity: 0.9;
 }
 
-/* ── Scrollbars ───────────────────────────────────────────────── */
+/* ── Code block copy button ───────────────────────────────────── */
+.pre-wrapper {
+  position: relative;
+  margin-top: 12px;
+}
+
+.pre-wrapper pre {
+  margin-top: 0;
+}
+
+.code-copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.3px;
+  padding: 3px 8px;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s, background 0.15s;
+}
+
+.pre-wrapper:hover .code-copy-btn {
+  opacity: 1;
+}
+
+.code-copy-btn:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: var(--text);
+}
+
+.code-copy-btn.copied {
+  color: #4ade80;
+  border-color: rgba(74, 222, 128, 0.25);
+}
+
+/* ── Scroll-to-bottom button ──────────────────────────────────── */
+#scroll-btn {
+  position: fixed;
+  bottom: 106px;
+  right: 24px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 6;
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease,
+              background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+#scroll-btn.visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: all;
+}
+
+#scroll-btn:hover {
+  background: var(--surface);
+  color: var(--text);
+  border-color: rgba(255, 255, 255, 0.15);
+}
 
 /* Chat — Firefox */
 #chat-container {

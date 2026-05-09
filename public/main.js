@@ -108,7 +108,47 @@ if (conversationHistory.length > 0) {
   });
 }
 
-// ── Textarea auto-resize ──────────────────────────────────────────
+const scrollBtn = document.getElementById("scroll-btn");
+
+// ── Scroll-to-bottom button ───────────────────────────────────────
+chatContainer.addEventListener("scroll", () => {
+  const atBottom =
+    chatContainer.scrollHeight - chatContainer.scrollTop - chatContainer.clientHeight < 80;
+  scrollBtn.classList.toggle("visible", !atBottom);
+});
+
+scrollBtn.addEventListener("click", () => {
+  chatContainer.scrollTo({ top: chatContainer.scrollHeight, behavior: "smooth" });
+});
+
+// ── Code block copy buttons ───────────────────────────────────────
+function addCodeCopyButtons(bubble) {
+  bubble.querySelectorAll("pre").forEach(pre => {
+    const wrapper = document.createElement("div");
+    wrapper.className = "pre-wrapper";
+    pre.replaceWith(wrapper);
+    wrapper.appendChild(pre);
+
+    const btn = document.createElement("button");
+    btn.className = "code-copy-btn";
+    btn.textContent = "copy";
+    btn.onclick = async () => {
+      const text = pre.querySelector("code")?.innerText ?? pre.innerText;
+      try {
+        await navigator.clipboard.writeText(text);
+        btn.textContent = "✓ copied";
+        btn.classList.add("copied");
+        setTimeout(() => {
+          btn.textContent = "copy";
+          btn.classList.remove("copied");
+        }, 2000);
+      } catch {
+        btn.textContent = "failed";
+      }
+    };
+    wrapper.appendChild(btn);
+  });
+}
 userInput.addEventListener("input", () => {
   userInput.style.height = "auto";
   userInput.style.height = Math.min(userInput.scrollHeight, 140) + "px";
@@ -156,6 +196,7 @@ function renderMessage(role, text, animate = true) {
       ],
       throwOnError: false,
     });
+    addCodeCopyButtons(bubble);
   } else {
     bubble.textContent = text;
   }

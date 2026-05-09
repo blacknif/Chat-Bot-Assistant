@@ -52,12 +52,19 @@ header {
 .logo-dot {
   width: 28px;
   height: 28px;
-  border-radius: 50%;
-  background: var(--accent);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.logo-dot svg {
+  animation: nova-spin 18s linear infinite;
+}
+
+@keyframes nova-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
 
 header h1 {
@@ -443,13 +450,9 @@ code {
 .empty-icon {
   width: 56px;
   height: 56px;
-  border-radius: 50%;
-  background: var(--surface2);
-  border: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 26px;
 }
 
 .empty-state h2 {

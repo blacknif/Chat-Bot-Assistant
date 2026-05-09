@@ -14,7 +14,23 @@
 <body>
 
   <header>
-    <div class="logo-dot">✦</div>
+    <div class="logo-dot">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="nova-h" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#c4b5fd"/>
+            <stop offset="100%" stop-color="#6d5ef5"/>
+          </linearGradient>
+          <filter id="glow-h">
+            <feGaussianBlur stdDeviation="1.2" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <path filter="url(#glow-h)" fill="url(#nova-h)"
+          d="M14 1.5 L16.3 11.7 L26.5 14 L16.3 16.3 L14 26.5 L11.7 16.3 L1.5 14 L11.7 11.7 Z"/>
+        <circle cx="14" cy="14" r="2.2" fill="white" opacity="0.55"/>
+      </svg>
+    </div>
     <h1>Nova</h1>
     <span class="author-badge">Made by Jovan Yeo Kaisheng</span>
     <button id="memory-toggle" onclick="toggleMemory()">Memory: ON</button>
@@ -39,7 +55,23 @@
 
   <div id="chat-container">
     <div class="empty-state" id="empty-state">
-      <div class="empty-icon">✦</div>
+      <div class="empty-icon">
+        <svg width="36" height="36" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="nova-e" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#c4b5fd"/>
+              <stop offset="100%" stop-color="#6d5ef5"/>
+            </linearGradient>
+            <filter id="glow-e">
+              <feGaussianBlur stdDeviation="2" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <path filter="url(#glow-e)" fill="url(#nova-e)"
+            d="M28 3 L32.5 23.5 L53 28 L32.5 32.5 L28 53 L23.5 32.5 L3 28 L23.5 23.5 Z"/>
+          <circle cx="28" cy="28" r="4.5" fill="white" opacity="0.5"/>
+        </svg>
+      </div>
       <h2>How can I help you?</h2>
       <p>I'm Nova, your friendly AI assistant. Ask me anything!</p>
       <div class="suggestions">

@@ -349,6 +349,80 @@ async function sendMessage() {
   }
 }
 
+// ── Constellation background ──────────────────────────────────────
+(function initBackground() {
+  const canvas = document.getElementById("bg-canvas");
+  const ctx = canvas.getContext("2d");
+
+  const COUNT    = 85;
+  const MAX_DIST = 135;
+  const SPEED    = 0.28;
+  const DOT_COLORS = ["196,181,253", "124,111,247", "255,255,255", "167,139,250"];
+
+  let W, H, particles;
+
+  function resize() {
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+
+  function spawn() {
+    particles = Array.from({ length: COUNT }, () => ({
+      x:  Math.random() * W,
+      y:  Math.random() * H,
+      vx: (Math.random() - 0.5) * SPEED,
+      vy: (Math.random() - 0.5) * SPEED,
+      r:  Math.random() * 1.4 + 0.4,
+      c:  DOT_COLORS[Math.floor(Math.random() * DOT_COLORS.length)],
+      o:  Math.random() * 0.35 + 0.15,
+    }));
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Lines between nearby particles
+    for (let i = 0; i < particles.length; i++) {
+      const a = particles[i];
+      for (let j = i + 1; j < particles.length; j++) {
+        const b = particles[j];
+        const dx = a.x - b.x, dy = a.y - b.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < MAX_DIST) {
+          ctx.beginPath();
+          ctx.strokeStyle = `rgba(196,181,253,${(1 - dist / MAX_DIST) * 0.1})`;
+          ctx.lineWidth = 0.5;
+          ctx.moveTo(a.x, a.y);
+          ctx.lineTo(b.x, b.y);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // Dots
+    for (const p of particles) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${p.c},${p.o})`;
+      ctx.fill();
+
+      p.x += p.vx;
+      p.y += p.vy;
+      if (p.x < -10) p.x = W + 10;
+      if (p.x > W + 10) p.x = -10;
+      if (p.y < -10) p.y = H + 10;
+      if (p.y > H + 10) p.y = -10;
+    }
+
+    requestAnimationFrame(draw);
+  }
+
+  resize();
+  spawn();
+  draw();
+
+  window.addEventListener("resize", () => { resize(); spawn(); });
+})();
 // ── Clear chat ────────────────────────────────────────────────────
 let toastTimeout;
 

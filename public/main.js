@@ -4,45 +4,30 @@ const SHOULD_PERSIST = true;
 const MAX_HISTORY = 20;
 
 // ── Semantic tone → color mapping ────────────────────────────────
-// Color reflects the nature of the response, not random cycling.
-// All colors contrast-checked against the #222228 bubble background.
 const TONE_COLORS = {
-  technical:   "#7dd3fc", // sky blue    — code, math, logic, data
-  creative:    "#d8b4fe", // violet      — poetry, stories, imagination
-  warning:     "#fcd34d", // amber       — caution, errors, important notes
-  positive:    "#86efac", // mint green  — praise, success, encouragement
-  empathetic:  "#fda4af", // rose        — emotional, supportive, apologetic
-  curious:     "#fb923c", // orange      — questions back, exploring ideas
-  default:     "#c4bfff", // lavender    — general explanations, neutral
+  technical:   "#7dd3fc",
+  creative:    "#d8b4fe",
+  warning:     "#fcd34d",
+  positive:    "#86efac",
+  empathetic:  "#fda4af",
+  curious:     "#fb923c",
+  default:     "#c4bfff",
 };
 
 function classifyTone(text) {
   const t = text.toLowerCase();
-
-  // Technical: code blocks, math symbols, or technical vocabulary
   if (/```|`[^`]+`|\$[^$]+\$|\\frac|\\int|algorithm|function|variable|syntax|equation|formula|derivative|integral|python|javascript|css|html|api|debug|error:|exception/.test(t))
     return "technical";
-
-  // Warning: explicit caution language or error states
   if (/\b(warning|caution|careful|danger|risk|important note|be aware|watch out|avoid|don't|cannot|invalid|mistake|wrong|incorrect|failed|failure)\b/.test(t))
     return "warning";
-
-  // Positive: affirmation, success, encouragement
   if (/\b(great|excellent|perfect|well done|correct|you got it|exactly right|congrats|congratulations|nicely done|that's right|good job|absolutely|you're right)\b/.test(t))
     return "positive";
-
-  // Empathetic: emotional or supportive tone
   if (/\b(i understand|i'm sorry|that sounds|how are you|feel free|don't worry|it's okay|totally normal|that must|i can imagine|take care|here for you)\b/.test(t))
     return "empathetic";
-
-  // Creative: imaginative or artistic content
   if (/\b(poem|poetry|story|imagine|once upon|metaphor|rhyme|haiku|creative|narrative|character|fictional|fantasy|tale|sonnet|verse)\b/.test(t))
     return "creative";
-
-  // Curious: the AI is asking or exploring
   if (/\?/.test(t) && (t.match(/\?/g) || []).length >= 2)
     return "curious";
-
   return "default";
 }
 
@@ -91,26 +76,18 @@ function trimHistory() {
 
 // ── Restore saved messages on load ────────────────────────────────
 conversationHistory = SHOULD_PERSIST ? loadHistory() : [];
-
-if (!SHOULD_PERSIST) {
-  localStorage.removeItem(STORAGE_KEY);
-}
+if (!SHOULD_PERSIST) localStorage.removeItem(STORAGE_KEY);
 
 if (conversationHistory.length > 0) {
-  if (emptyState) {
-    emptyState.remove();
-    emptyState = null;
-  }
+  if (emptyState) { emptyState.remove(); emptyState = null; }
   conversationHistory.forEach(entry => {
     const role = entry.role === "model" ? "ai" : "user";
-    const text = entry.parts[0].text;
-    renderMessage(role, text, false);
+    renderMessage(role, entry.parts[0].text, false);
   });
 }
 
 const scrollBtn = document.getElementById("scroll-btn");
 
-// ── Scroll-to-bottom button ───────────────────────────────────────
 chatContainer.addEventListener("scroll", () => {
   const atBottom =
     chatContainer.scrollHeight - chatContainer.scrollTop - chatContainer.clientHeight < 80;
@@ -120,6 +97,103 @@ chatContainer.addEventListener("scroll", () => {
 scrollBtn.addEventListener("click", () => {
   chatContainer.scrollTo({ top: chatContainer.scrollHeight, behavior: "smooth" });
 });
+
+// ── Math-safe markdown renderer ───────────────────────────────────
+// Problem: marked.js escapes $ and \ before KaTeX can process them.
+// Solution: extract all math/chem/science expressions → replace with
+// unique placeholders → run marked → restore → run KaTeX.
+//
+// Supported syntaxes:
+//   $$...$$          display math
+//   $...$            inline math
+//   \[...\]          display math (LaTeX style)
+//   \(...\)          inline math (LaTeX style)
+//   \ce{...}         chemistry  (mhchem)  e.g. \ce{H2SO4}, \ce{Fe^2+}
+//   \pu{...}         physical units       e.g. \pu{6.022e23 mol-1}
+//   \text{...}       text inside math
+//   ^superscript     e.g. 10^{23}  (only inside $)
+//   _subscript
+//
+function safeParse(raw) {
+  const saved = [];
+
+  function stash(str) {
+    saved.push(str);
+    return `\x02MATH${saved.length - 1}\x03`;
+  }
+
+  const protected_ = raw
+    // 1. Fenced code blocks  — must go first so math inside code is not touched
+    .replace(/```[\s\S]*?```/g, m => stash(m))
+    .replace(/`[^`\n]+`/g, m => stash(m))
+
+    // 2. Display math  $$...$$
+    .replace(/\$\$[\s\S]+?\$\$/g, m => stash(m))
+
+    // 3. Display math  \[...\]
+    .replace(/\\\[[\s\S]+?\\\]/g, m => stash(m))
+
+    // 4. Chemistry  \ce{...}  (wrap in $$ so KaTeX renders it)
+    .replace(/\\ce\{[^}]*\}/g, m => stash(`$${m}$`))
+
+    // 5. Physical units  \pu{...}
+    .replace(/\\pu\{[^}]*\}/g, m => stash(`$${m}$`))
+
+    // 6. Inline math  \(...\)
+    .replace(/\\\([\s\S]+?\\\)/g, m => stash(m))
+
+    // 7. Inline math  $...$  (single dollar — must not match $$)
+    //    Allow multiline only up to 3 lines to avoid false positives
+    .replace(/(?<!\$)\$(?!\$)([^\n$]{1,400}?)\$(?!\$)/g, m => stash(m));
+
+  // Run markdown on the protected string
+  let html = marked.parse(protected_);
+
+  // Restore all stashed expressions (placeholders may be inside <p> tags)
+  html = html.replace(/\x02MATH(\d+)\x03/g, (_, i) => saved[i]);
+
+  return html;
+}
+
+// ── KaTeX render options (shared) ────────────────────────────────
+const KATEX_OPTIONS = {
+  delimiters: [
+    { left: "$$",  right: "$$",  display: true  },
+    { left: "$",   right: "$",   display: false },
+    { left: "\\[", right: "\\]", display: true  },
+    { left: "\\(", right: "\\)", display: false },
+  ],
+  // mhchem is loaded as a KaTeX extension via its CDN script;
+  // it auto-registers \ce and \pu — no extra config needed here.
+  macros: {
+    // ── Physics / SI ──────────────────────────────────────────
+    "\\hbar":      "\\hslash",           // reduced Planck (redundant but safe)
+    "\\angstrom":  "\\text{Å}",
+    "\\degree":    "^{\\circ}",
+    "\\celcius":   "^{\\circ}\\text{C}",
+    "\\kelvin":    "\\text{K}",
+
+    // ── Biology / biochemistry ────────────────────────────────
+    "\\DNA":       "\\text{DNA}",
+    "\\RNA":       "\\text{RNA}",
+    "\\ATP":       "\\text{ATP}",
+    "\\ADP":       "\\text{ADP}",
+    "\\pH":        "\\text{pH}",
+    "\\Keq":       "K_{\\text{eq}}",
+    "\\Km":        "K_m",
+    "\\Vmax":      "V_{\\text{max}}",
+
+    // ── Common math shorthands ────────────────────────────────
+    "\\R":         "\\mathbb{R}",
+    "\\N":         "\\mathbb{N}",
+    "\\Z":         "\\mathbb{Z}",
+    "\\C":         "\\mathbb{C}",
+    "\\eps":       "\\varepsilon",
+    "\\vp":        "\\varphi",
+  },
+  throwOnError: false,
+  errorColor: "#ff6b6b",
+};
 
 // ── Code block copy buttons ───────────────────────────────────────
 function addCodeCopyButtons(bubble) {
@@ -138,17 +212,13 @@ function addCodeCopyButtons(bubble) {
         await navigator.clipboard.writeText(text);
         btn.textContent = "✓ copied";
         btn.classList.add("copied");
-        setTimeout(() => {
-          btn.textContent = "copy";
-          btn.classList.remove("copied");
-        }, 2000);
-      } catch {
-        btn.textContent = "failed";
-      }
+        setTimeout(() => { btn.textContent = "copy"; btn.classList.remove("copied"); }, 2000);
+      } catch { btn.textContent = "failed"; }
     };
     wrapper.appendChild(btn);
   });
 }
+
 userInput.addEventListener("input", () => {
   userInput.style.height = "auto";
   userInput.style.height = Math.min(userInput.scrollHeight, 140) + "px";
@@ -182,20 +252,18 @@ function renderMessage(role, text, animate = true) {
 
   const bubble = document.createElement("div");
   bubble.className = "bubble";
+
   if (role === "ai") {
     const color = TONE_COLORS[classifyTone(text)];
     bubble.style.color = color;
     bubble.style.setProperty("--tone-color", color);
-    bubble.innerHTML = marked.parse(text);
-    renderMathInElement(bubble, {
-      delimiters: [
-        { left: "$$", right: "$$", display: true },
-        { left: "$",  right: "$",  display: false },
-        { left: "\\[", right: "\\]", display: true },
-        { left: "\\(", right: "\\)", display: false },
-      ],
-      throwOnError: false,
-    });
+
+    // Use safeParse to protect math/chem from marked's escaping
+    bubble.innerHTML = safeParse(text);
+
+    // Render all KaTeX expressions (math + \ce + \pu + macros)
+    renderMathInElement(bubble, KATEX_OPTIONS);
+
     addCodeCopyButtons(bubble);
   } else {
     bubble.textContent = text;
@@ -206,15 +274,12 @@ function renderMessage(role, text, animate = true) {
 
   const actions = document.createElement("div");
   actions.className = "msg-actions";
-
   const copyBtn = makeActionBtn("📋 copy", () => copyText(bubble, copyBtn, text));
   actions.appendChild(copyBtn);
-
   if (role === "ai") {
     const regenBtn = makeActionBtn("↺ regenerate", () => regenerate(msg));
     actions.appendChild(regenBtn);
   }
-
   msg.appendChild(actions);
   chatContainer.appendChild(msg);
   chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -229,30 +294,20 @@ function makeActionBtn(label, onClick) {
   return btn;
 }
 
-// ── Copy to clipboard ─────────────────────────────────────────────
 async function copyText(bubble, btn, rawText) {
   try {
     await navigator.clipboard.writeText(rawText);
     btn.textContent = "✓ copied";
     btn.classList.add("copied");
-    setTimeout(() => {
-      btn.textContent = "📋 copy";
-      btn.classList.remove("copied");
-    }, 2000);
-  } catch {
-    btn.textContent = "failed";
-  }
+    setTimeout(() => { btn.textContent = "📋 copy"; btn.classList.remove("copied"); }, 2000);
+  } catch { btn.textContent = "failed"; }
 }
 
 // ── Regenerate last AI message ────────────────────────────────────
 async function regenerate(aiMsgEl) {
   aiMsgEl.remove();
-
   const histIdx = conversationHistory.findLastIndex(e => e.role === "model");
-  if (histIdx !== -1) {
-    conversationHistory = conversationHistory.slice(0, histIdx);
-  }
-
+  if (histIdx !== -1) conversationHistory = conversationHistory.slice(0, histIdx);
   if (memoryEnabled) saveHistory();
 
   sendBtn.disabled = true;
@@ -262,15 +317,12 @@ async function regenerate(aiMsgEl) {
     const payload = conversationHistory.length
       ? { contents: conversationHistory }
       : { contents: [] };
-
     const reply = await fetchWithRetry(payload);
-
     if (memoryEnabled) {
       conversationHistory.push({ role: "model", parts: [{ text: reply }] });
       trimHistory();
       saveHistory();
     }
-
     removeTyping();
     renderMessage("ai", reply);
   } catch (err) {
@@ -323,7 +375,7 @@ async function fetchWithRetry(body, retries = 4) {
     const response = await fetch(API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
     });
 
     const data = await response.json();
@@ -421,8 +473,6 @@ async function sendMessage() {
 
   function draw() {
     ctx.clearRect(0, 0, W, H);
-
-    // Lines between nearby particles
     for (let i = 0; i < particles.length; i++) {
       const a = particles[i];
       for (let j = i + 1; j < particles.length; j++) {
@@ -439,31 +489,24 @@ async function sendMessage() {
         }
       }
     }
-
-    // Dots
     for (const p of particles) {
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
       ctx.fillStyle = `rgba(${p.c},${p.o})`;
       ctx.fill();
-
-      p.x += p.vx;
-      p.y += p.vy;
+      p.x += p.vx; p.y += p.vy;
       if (p.x < -10) p.x = W + 10;
       if (p.x > W + 10) p.x = -10;
       if (p.y < -10) p.y = H + 10;
       if (p.y > H + 10) p.y = -10;
     }
-
     requestAnimationFrame(draw);
   }
 
-  resize();
-  spawn();
-  draw();
-
+  resize(); spawn(); draw();
   window.addEventListener("resize", () => { resize(); spawn(); });
 })();
+
 // ── Clear chat ────────────────────────────────────────────────────
 let toastTimeout;
 
@@ -481,7 +524,6 @@ function hideToast() {
 function toggleMemory() {
   memoryEnabled = !memoryEnabled;
   localStorage.setItem("memoryEnabled", memoryEnabled);
-
   if (memoryEnabled) {
     memoryBtn.textContent = "Memory: ON";
     memoryBtn.classList.add("active");

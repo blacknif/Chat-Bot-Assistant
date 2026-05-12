@@ -545,7 +545,7 @@ function clearChat() {
   es.className = "empty-state";
   es.id = "empty-state";
   es.innerHTML = `
-    <div class="empty-icon">✦</div>
+    <div class="empty-icon"></div>
     <h2>How can I help you?</h2>
     <p>Ask me anything.</p>
     <div class="suggestions">

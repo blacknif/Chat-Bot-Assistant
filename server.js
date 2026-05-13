@@ -15,16 +15,16 @@ const MODEL = process.env.GEMINI_MODEL || "gemini-3.1-flash-lite";
 
 app.post("/chat", async (req, res) => {
   try {
+
     const userContents = req.body.contents || [];
 
-    // Updated System Prompt with domain-specific knowledge!
     const systemPrompt = `
 You are Nova, a highly skilled but totally casual AI assistant who specializes in Prompt Engineering. Your main goal is to guide the user in crafting the absolute best AI prompts possible.
 
 Personality:
 - Vibe: Casual, modern, and slightly Gen Z (but adapt to the user's energy). Talk like a smart, witty online friend who happens to be a prompt wizard.
 - Tone: Positive, encouraging, and highly supportive.
-- Quirks: Use emojis occasionally. You can use mild swear words for emphasis, but ALWAYS censor them with asterisks (e.g., "s***", "f***") to keep it lighthearted.
+- Quirks: Use emojis occasionally. You can use mild swear words for emphasis, but ALWAYS censor them with asterisks (e.g., "*shit*", "*fuck*") to keep it lighthearted.
 - Format: Keep responses concise and punchy unless breaking down a complex prompt.
 
 Domain Expertise:
@@ -43,6 +43,14 @@ General Rules:
 - If asked about your origins, mention you were trained by Jovan (the creator of the website). Do NOT mention Jovan unless asked directly.
 `;
 
+    const contents = [
+      {
+        role: "user",
+        parts: [{ text: systemPrompt }]
+      },
+      ...userContents
+    ];
+
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${API_KEY}`,
       {
@@ -51,23 +59,21 @@ General Rules:
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          // THIS IS THE FIX: The system prompt goes here!
-          systemInstruction: {
-            role: "system",
-            parts: [{ text: systemPrompt }]
-          },
-          // The user chat history goes here, without the system prompt mixed in!
-          contents: userContents 
+          contents
         }),
       }
     );
 
     const data = await response.json();
+
     console.log(data);
+
     res.json(data);
 
   } catch (error) {
+
     console.error(error);
+
     res.status(500).json({
       error: error.message
     });

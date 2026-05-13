@@ -99,21 +99,6 @@ scrollBtn.addEventListener("click", () => {
 });
 
 // ── Math-safe markdown renderer ───────────────────────────────────
-// Problem: marked.js escapes $ and \ before KaTeX can process them.
-// Solution: extract all math/chem/science expressions → replace with
-// unique placeholders → run marked → restore → run KaTeX.
-//
-// Supported syntaxes:
-//   $$...$$          display math
-//   $...$            inline math
-//   \[...\]          display math (LaTeX style)
-//   \(...\)          inline math (LaTeX style)
-//   \ce{...}         chemistry  (mhchem)  e.g. \ce{H2SO4}, \ce{Fe^2+}
-//   \pu{...}         physical units       e.g. \pu{6.022e23 mol-1}
-//   \text{...}       text inside math
-//   ^superscript     e.g. 10^{23}  (only inside $)
-//   _subscript
-//
 function safeParse(raw) {
   const saved = [];
 
@@ -123,39 +108,21 @@ function safeParse(raw) {
   }
 
   const protected_ = raw
-    // 1. Fenced code blocks  — must go first so math inside code is not touched
     .replace(/```[\s\S]*?```/g, m => stash(m))
     .replace(/`[^`\n]+`/g, m => stash(m))
-
-    // 2. Display math  $$...$$
     .replace(/\$\$[\s\S]+?\$\$/g, m => stash(m))
-
-    // 3. Display math  \[...\]
     .replace(/\\\[[\s\S]+?\\\]/g, m => stash(m))
-
-    // 4. Chemistry  \ce{...}  (wrap in $$ so KaTeX renders it)
     .replace(/\\ce\{[^}]*\}/g, m => stash(`$${m}$`))
-
-    // 5. Physical units  \pu{...}
     .replace(/\\pu\{[^}]*\}/g, m => stash(`$${m}$`))
-
-    // 6. Inline math  \(...\)
     .replace(/\\\([\s\S]+?\\\)/g, m => stash(m))
-
-    // 7. Inline math  $...$  (single dollar — must not match $$)
-    //    Allow multiline only up to 3 lines to avoid false positives
     .replace(/(?<!\$)\$(?!\$)([^\n$]{1,400}?)\$(?!\$)/g, m => stash(m));
 
-  // Run markdown on the protected string
   let html = marked.parse(protected_);
-
-  // Restore all stashed expressions (placeholders may be inside <p> tags)
   html = html.replace(/\x02MATH(\d+)\x03/g, (_, i) => saved[i]);
-
   return html;
 }
 
-// ── KaTeX render options (shared) ────────────────────────────────
+// ── KaTeX render options ──────────────────────────────────────────
 const KATEX_OPTIONS = {
   delimiters: [
     { left: "$$",  right: "$$",  display: true  },
@@ -163,33 +130,15 @@ const KATEX_OPTIONS = {
     { left: "\\[", right: "\\]", display: true  },
     { left: "\\(", right: "\\)", display: false },
   ],
-  // mhchem is loaded as a KaTeX extension via its CDN script;
-  // it auto-registers \ce and \pu — no extra config needed here.
   macros: {
-    // ── Physics / SI ──────────────────────────────────────────
-    "\\hbar":      "\\hslash",           // reduced Planck (redundant but safe)
-    "\\angstrom":  "\\text{Å}",
-    "\\degree":    "^{\\circ}",
-    "\\celcius":   "^{\\circ}\\text{C}",
-    "\\kelvin":    "\\text{K}",
-
-    // ── Biology / biochemistry ────────────────────────────────
-    "\\DNA":       "\\text{DNA}",
-    "\\RNA":       "\\text{RNA}",
-    "\\ATP":       "\\text{ATP}",
-    "\\ADP":       "\\text{ADP}",
-    "\\pH":        "\\text{pH}",
-    "\\Keq":       "K_{\\text{eq}}",
-    "\\Km":        "K_m",
-    "\\Vmax":      "V_{\\text{max}}",
-
-    // ── Common math shorthands ────────────────────────────────
-    "\\R":         "\\mathbb{R}",
-    "\\N":         "\\mathbb{N}",
-    "\\Z":         "\\mathbb{Z}",
-    "\\C":         "\\mathbb{C}",
-    "\\eps":       "\\varepsilon",
-    "\\vp":        "\\varphi",
+    "\\angstrom": "\\text{Å}", "\\degree": "^{\\circ}",
+    "\\celcius":  "^{\\circ}\\text{C}", "\\kelvin": "\\text{K}",
+    "\\DNA": "\\text{DNA}", "\\RNA": "\\text{RNA}",
+    "\\ATP": "\\text{ATP}", "\\ADP": "\\text{ADP}",
+    "\\pH":  "\\text{pH}",  "\\Km":  "K_m", "\\Vmax": "V_{\\text{max}}",
+    "\\R": "\\mathbb{R}", "\\N": "\\mathbb{N}",
+    "\\Z": "\\mathbb{Z}", "\\C": "\\mathbb{C}",
+    "\\eps": "\\varepsilon",
   },
   throwOnError: false,
   errorColor: "#ff6b6b",
@@ -219,6 +168,60 @@ function addCodeCopyButtons(bubble) {
   });
 }
 
+// ── Render grounding sources ──────────────────────────────────────
+function renderSources(meta, msg) {
+  if (!meta) return;
+
+  const chunks  = meta.groundingChunks?.filter(c => c.web?.uri) || [];
+  const queries = meta.webSearchQueries || [];
+  if (!chunks.length && !queries.length) return;
+
+  const sourceEl = document.createElement("div");
+  sourceEl.className = "msg-sources";
+
+  // Search query chips
+  if (queries.length) {
+    const queryRow = document.createElement("div");
+    queryRow.className = "sources-queries";
+    queryRow.innerHTML = `<span class="sources-label">🔍 searched:</span>`;
+    queries.forEach(q => {
+      const chip = document.createElement("span");
+      chip.className = "source-query";
+      chip.textContent = q;
+      queryRow.appendChild(chip);
+    });
+    sourceEl.appendChild(queryRow);
+  }
+
+  // Source link pills
+  if (chunks.length) {
+    const seen = new Set();
+    const linkRow = document.createElement("div");
+    linkRow.className = "sources-links";
+    linkRow.innerHTML = `<span class="sources-label">sources:</span>`;
+
+    chunks.forEach(chunk => {
+      const { uri, title } = chunk.web;
+      let host;
+      try { host = new URL(uri).hostname.replace(/^www\./, ""); } catch { host = uri; }
+      if (seen.has(host)) return;
+      seen.add(host);
+
+      const a = document.createElement("a");
+      a.href = uri;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.className = "source-pill";
+      a.textContent = title || host;
+      a.title = uri;
+      linkRow.appendChild(a);
+    });
+    sourceEl.appendChild(linkRow);
+  }
+
+  msg.appendChild(sourceEl);
+}
+
 userInput.addEventListener("input", () => {
   userInput.style.height = "auto";
   userInput.style.height = Math.min(userInput.scrollHeight, 140) + "px";
@@ -237,7 +240,7 @@ function sendSuggestion(btn) {
 }
 
 // ── Render a message bubble ───────────────────────────────────────
-function renderMessage(role, text, animate = true) {
+function renderMessage(role, text, animate = true, groundingMeta = null) {
   const messageId = messageIdCounter++;
   if (emptyState) { emptyState.remove(); emptyState = null; }
 
@@ -257,13 +260,8 @@ function renderMessage(role, text, animate = true) {
     const color = TONE_COLORS[classifyTone(text)];
     bubble.style.color = color;
     bubble.style.setProperty("--tone-color", color);
-
-    // Use safeParse to protect math/chem from marked's escaping
     bubble.innerHTML = safeParse(text);
-
-    // Render all KaTeX expressions (math + \ce + \pu + macros)
     renderMathInElement(bubble, KATEX_OPTIONS);
-
     addCodeCopyButtons(bubble);
   } else {
     bubble.textContent = text;
@@ -281,6 +279,10 @@ function renderMessage(role, text, animate = true) {
     actions.appendChild(regenBtn);
   }
   msg.appendChild(actions);
+
+  // Append search sources if the reply used Google Search
+  if (role === "ai") renderSources(groundingMeta, msg);
+
   chatContainer.appendChild(msg);
   chatContainer.scrollTop = chatContainer.scrollHeight;
   return bubble;
@@ -317,14 +319,14 @@ async function regenerate(aiMsgEl) {
     const payload = conversationHistory.length
       ? { contents: conversationHistory }
       : { contents: [] };
-    const reply = await fetchWithRetry(payload);
+    const { reply, groundingMeta } = await fetchWithRetry(payload);
     if (memoryEnabled) {
       conversationHistory.push({ role: "model", parts: [{ text: reply }] });
       trimHistory();
       saveHistory();
     }
     removeTyping();
-    renderMessage("ai", reply);
+    renderMessage("ai", reply, true, groundingMeta);
   } catch (err) {
     removeTyping();
     renderMessage("ai", "⚠ " + err.message);
@@ -366,6 +368,7 @@ function setTypingStatus(text) {
 }
 
 // ── Fetch with retry (503/429 backoff) ────────────────────────────
+// Returns { reply, groundingMeta } so sources can be shown in the bubble.
 async function fetchWithRetry(body, retries = 4) {
   if (!body.contents || body.contents.length === 0) {
     throw new Error("No conversation history sent to model.");
@@ -393,9 +396,12 @@ async function fetchWithRetry(body, retries = 4) {
 
     if (data.error) throw new Error(data.error.message || "API error");
 
-    const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const candidate    = data?.candidates?.[0];
+    const reply        = candidate?.content?.parts?.[0]?.text;
+    const groundingMeta = candidate?.groundingMetadata ?? null;
+
     if (!reply) throw new Error("Empty response from model.");
-    return reply;
+    return { reply, groundingMeta };
   }
 }
 
@@ -423,7 +429,7 @@ async function sendMessage() {
       ? { contents: conversationHistory }
       : { contents: [{ role: "user", parts: [{ text }] }] };
 
-    const reply = await fetchWithRetry(payload);
+    const { reply, groundingMeta } = await fetchWithRetry(payload);
 
     if (memoryEnabled) {
       conversationHistory.push({ role: "model", parts: [{ text: reply }] });
@@ -432,7 +438,7 @@ async function sendMessage() {
     }
 
     removeTyping();
-    renderMessage("ai", reply);
+    renderMessage("ai", reply, true, groundingMeta);
   } catch (err) {
     removeTyping();
     renderMessage("ai", "⚠ " + err.message);
@@ -545,9 +551,25 @@ function clearChat() {
   es.className = "empty-state";
   es.id = "empty-state";
   es.innerHTML = `
-    <div class="empty-icon"></div>
+    <div class="empty-icon">
+      <svg width="36" height="36" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="nova-e2" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#c4b5fd"/>
+            <stop offset="100%" stop-color="#6d5ef5"/>
+          </linearGradient>
+          <filter id="glow-e2">
+            <feGaussianBlur stdDeviation="2" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <path filter="url(#glow-e2)" fill="url(#nova-e2)"
+          d="M28 3 L32.5 23.5 L53 28 L32.5 32.5 L28 53 L23.5 32.5 L3 28 L23.5 23.5 Z"/>
+        <circle cx="28" cy="28" r="4.5" fill="white" opacity="0.5"/>
+      </svg>
+    </div>
     <h2>How can I help you?</h2>
-    <p>Ask me anything.</p>
+    <p>I'm Nova, your friendly AI assistant. Ask me anything!</p>
     <div class="suggestions">
       <button class="suggestion-chip" onclick="sendSuggestion(this)">Explain quantum computing</button>
       <button class="suggestion-chip" onclick="sendSuggestion(this)">Write a short poem</button>

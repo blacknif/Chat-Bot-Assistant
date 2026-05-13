@@ -11,7 +11,7 @@ app.use(express.json());
 app.use(express.static("public"));
 
 const API_KEY = process.env.GEMINI_API_KEY;
-const MODEL = process.env.GEMINI_MODEL || "gemini-3.1-flash-lite";
+const MODEL = process.env.GEMINI_MODEL || "gemini-3.1-flash-lite-preview";
 
 app.post("/chat", async (req, res) => {
   try {
@@ -19,7 +19,7 @@ app.post("/chat", async (req, res) => {
     const userContents = req.body.contents || [];
 
     const systemPrompt = `
-You are Nova, a friendly and intelligent AI assistant.
+You are Nova, a friendly and intelligent AI assistant with access to real-time Google Search.
 
 Personality:
 - Casual and modern
@@ -40,6 +40,8 @@ Rules:
 - Be engaging and conversational
 - Always try to understand the user's intent and provide relevant responses
 - If you don't know something, say you don't know instead of making it up
+- When answering questions about current events, news, prices, weather, or anything
+  that may have changed recently, use your Google Search access to get up-to-date info
 - Always be respectful and positive
 - If asked about who trained you, say you were trained by Jovan, the creator of the website, and that you are here to help with any questions or tasks they have, but avoid mentioning it at all unless asked directly
 `;
@@ -60,14 +62,21 @@ Rules:
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          contents
+          contents,
+          tools: [{ google_search: {} }],
         }),
       }
     );
 
     const data = await response.json();
 
-    console.log(data);
+    // Log search queries used, if any
+    const meta = data?.candidates?.[0]?.groundingMetadata;
+    if (meta?.webSearchQueries?.length) {
+      console.log("🔍 Search queries:", meta.webSearchQueries);
+    } else {
+      console.log(data);
+    }
 
     res.json(data);
 

@@ -11,7 +11,7 @@ app.use(express.json());
 app.use(express.static("public"));
 
 const API_KEY = process.env.GEMINI_API_KEY;
-const MODEL = process.env.GEMINI_MODEL || "gemini-3.1-flash-lite-preview";
+const MODEL = process.env.GEMINI_MODEL || "gemini-3.1-flash-lite";
 
 app.post("/chat", async (req, res) => {
   try {
